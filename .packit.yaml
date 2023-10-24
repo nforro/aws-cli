@@ -1,0 +1,64 @@
+upstream_package_name: awscli
+downstream_package_name: awscli2
+
+upstream_project_url: https://github.com/aws/aws-cli
+issue_repository: https://github.com/aws/aws-cli
+
+upstream_tag_include: "^2\\..+"
+
+specfile_path: awscli2.spec
+
+files_to_sync:
+  - .packit.yaml
+
+srpm_build_deps:
+  - wget
+  - python3-build
+
+jobs:
+  - job: copr_build
+    trigger: pull_request
+    branch: v2
+    targets:
+      - fedora-rawhide
+    actions:
+      post-upstream-clone:
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/awscli2.spec
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/python312.patch
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/assertions.patch
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/ruamel-yaml-0.17.32.patch
+      create-archive:
+        # include also requirements*.txt in the root directory in sdist
+        - sed -i '/"requirements\/\*\*\/\*\.txt",/a \ \ \ \ "requirements*.txt",' pyproject.toml
+        - python3 -m build --sdist --outdir ./fedora/
+        - bash -c "ls -1t ./fedora/*.tar.gz | head -n 1"
+
+  - job: copr_build
+    trigger: pull_request
+    branch: develop
+    targets:
+      - fedora-rawhide
+    actions:
+      post-upstream-clone:
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/awscli2.spec
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/python312.patch
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/assertions.patch
+        - wget https://src.fedoraproject.org/rpms/awscli2/raw/main/f/ruamel-yaml-0.17.32.patch
+      create-archive:
+        # merge current branch into v2
+        - bash -c "b=$(git symbolic-ref --short HEAD) && git checkout v2 && git merge $b"
+        # include also requirements*.txt in the root directory in sdist
+        - sed -i '/"requirements\/\*\*\/\*\.txt",/a \ \ \ \ "requirements*.txt",' pyproject.toml
+        - python3 -m build --sdist --outdir ./fedora/
+        - bash -c "ls -1t ./fedora/*.tar.gz | head -n 1"
+
+  - job: propose_downstream
+    trigger: release
+    branch: v2
+    dist_git_branches:
+      - fedora-rawhide
+
+  - job: koji_build
+    trigger: commit
+    dist_git_branches:
+      - fedora-rawhide
