@@ -200,6 +200,9 @@ def find_master_dns(session, parsed_globals, cluster_id):
 
 
 def which(program):
+    if "PATH" not in os.environ:
+        return None
+
     for path in os.environ["PATH"].split(os.pathsep):
         path = path.strip('"')
         exe_file = os.path.join(path, program)
